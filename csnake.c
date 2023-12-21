@@ -12,7 +12,8 @@ int delay_ms = 150;
 bool game_over;
 bool game_win;
 
-typedef enum Slot {EMPTY_SLOT,
+typedef enum Slot {
+    EMPTY_SLOT,
     PILL_SLOT,
     SNAKE_HEAD_SLOT,
     SNAKE_VLINE_SLOT,
@@ -29,22 +30,60 @@ typedef struct CoordTuple {
     int col;
 } CoordTuple;
 
+CoordTuple* CreateCoordTuple(int r, int c) {
+    CoordTuple* tuple = malloc(sizeof(struct CoordTuple));
+    tuple->row = r;
+    tuple->col = c;
+    return tuple;
+}
+
+void free_CoordTuple(CoordTuple* tuple) {
+   free(tuple);
+   tuple = NULL;
+}
+
 typedef struct Snake {
     char direction;
     int length;
-    CoordTuple *segments;
+    CoordTuple** segments;
+    int segmentsLength;
 } Snake;
 
-bool SnakeCollides(Snake *snake, CoordTuple *target) {
+Snake* CreateSnake(int segLength) {
+    Snake* newSnake = malloc(sizeof(Snake));
+
+    newSnake->direction = '0'; //FIXME:
+    newSnake->length = 1;
+    newSnake->segments = calloc(sizeof(CoordTuple*), segLength);
+    newSnake->segmentsLength = segLength;
+
+    CoordTuple* tempCoord = CreateCoordTuple(board_size / 2, board_size / 2);
+
+    newSnake->segments[0] = tempCoord;
+
+    return newSnake;
+}
+
+void free_Snake(Snake* s) {
+    for (int i = 0; i < s->segmentsLength; i++) {
+        free_CoordTuple(s->segments[i]);
+    }
+    free(s->segments);
+    s->segments = NULL;
+    free(s);
+    s = NULL;
+}
+
+bool SnakeCollides(Snake* snake, CoordTuple* target) {
     for(int i = 0; i < snake->length; i++) {
-        if(snake->segments[i].row == target->row && snake->segments[i].col == target->col) {
+        if(snake->segments[i]->row == target->row && snake->segments[i]->col == target->col) {
             return true;
         }
     }
     return false;
 }
 
-void UpdatePill(CoordTuple *pill, Snake *snake) {
+void UpdatePill(CoordTuple* pill, Snake* snake) {
     do {
         pill->row = (rand() % (board_size - 1)) + 1;
         pill->col = (rand() % (board_size - 1)) + 1;
@@ -52,33 +91,31 @@ void UpdatePill(CoordTuple *pill, Snake *snake) {
 }
 
 void UpdateSnake(Snake *snake, CoordTuple *pill) {
-    CoordTuple newHeadPos;
-    newHeadPos.row = snake->segments[snake->length - 1].row;
-    newHeadPos.col = snake->segments[snake->length - 1].col;
+    CoordTuple* newHeadPos = CreateCoordTuple(snake->segments[snake->length - 1]->row, snake->segments[snake->length - 1]->col);
 
     switch(snake->direction) {
         case 'n':
-            newHeadPos.row--;
+            newHeadPos->row--;
             break;
         case 's':
-            newHeadPos.row++;
+            newHeadPos->row++;
             break;
         case 'e':
-            newHeadPos.col++;
+            newHeadPos->col++;
             break;
         case 'w':
-            newHeadPos.col--;
+            newHeadPos->col--;
             break;
     }
 
     if(snake->length == (board_size-1) * (board_size-1)) {
         game_win = true;
-    } else if(newHeadPos.row <= 0 || newHeadPos.row >= board_size || newHeadPos.col <= 0 || newHeadPos.col >= board_size) {
+    } else if(newHeadPos->row <= 0 || newHeadPos->row >= board_size || newHeadPos->col <= 0 || newHeadPos->col >= board_size) {
         game_over = true;
-    } else if(snake->length > 1 && SnakeCollides(snake, &newHeadPos)) {
+    } else if(snake->length > 1 && SnakeCollides(snake, newHeadPos)) {
         game_over = true;
     } else {
-        if(newHeadPos.row == pill->row && newHeadPos.col == pill->col) {
+        if(newHeadPos->row == pill->row && newHeadPos->col == pill->col) {
             UpdatePill(pill, snake);
             snake->segments[snake->length++] = newHeadPos;
         }
@@ -99,7 +136,7 @@ void ClearBoard(int board[board_size][board_size]) {
     }
 }
 
-void UpdateBoard(int board[board_size][board_size], Snake *snake, CoordTuple *pill) {
+void UpdateBoard(int board[board_size][board_size], Snake* snake, CoordTuple* pill) {
     ClearBoard(board);
     for(int i = 0; i < snake->length; i++) {
 
@@ -118,59 +155,57 @@ void UpdateBoard(int board[board_size][board_size], Snake *snake, CoordTuple *pi
             // if next piece is same col:
                 // VLINE
 
-            CoordTuple cur = snake->segments[i];
-            CoordTuple next = snake->segments[i+1];
+            CoordTuple* cur = snake->segments[i];
+            CoordTuple* next = snake->segments[i+1];
 
-            if(cur.row == next.row) {
+            if(cur->row == next->row) {
                 SLOT = SNAKE_HLINE_SLOT;
-            } else if(cur.col == next.col) {
+            } else if(cur->col == next->col) {
                 SLOT = SNAKE_VLINE_SLOT;
             }
 
             SLOT = SNAKE_TAIL_SLOT;
 
         } else {
-            CoordTuple cur = snake->segments[i];
-            CoordTuple next = snake->segments[i+1];
-            CoordTuple prev = snake->segments[i-1];
+            CoordTuple* cur = snake->segments[i];
+            CoordTuple* next = snake->segments[i+1];
+            CoordTuple* prev = snake->segments[i-1];
 
-            if(prev.row == cur.row) {
-                if(next.row == cur.row) {
+            if(prev->row == cur->row) {
+                if(next->row == cur->row) {
                     SLOT = SNAKE_HLINE_SLOT;
-                } else if(prev.col < cur.col) {
-                    if(next.row < cur.row) {
+                } else if(prev->col < cur->col) {
+                    if(next->row < cur->row) {
                         SLOT = SNAKE_LRCORNER_SLOT;
-                    } else if(next.row > cur.row) {
+                    } else if(next->row > cur->row) {
                         SLOT = SNAKE_URCORNER_SLOT;
                     }
-                } else if(prev.col > cur.col) {
-                    if(next.row < cur.row) {
+                } else if(prev->col > cur->col) {
+                    if(next->row < cur->row) {
                         SLOT = SNAKE_LLCORNER_SLOT;
-                    } else if(next.row > cur.row) {
+                    } else if(next->row > cur->row) {
                         SLOT = SNAKE_ULCORNER_SLOT;
                     }
                 }
-            } else if(prev.col == cur.col) {
-                if(next.col == cur.col) {
+            } else if(prev->col == cur->col) {
+                if(next->col == cur->col) {
                     SLOT = SNAKE_VLINE_SLOT;
-                } else if(prev.row < cur.row) {
-                    if(next.col > cur.col) {
+                } else if(prev->row < cur->row) {
+                    if(next->col > cur->col) {
                         SLOT = SNAKE_LLCORNER_SLOT;
-                    } else if(next.col < cur.col) {
+                    } else if(next->col < cur->col) {
                         SLOT = SNAKE_LRCORNER_SLOT;
                     }
-                } else if(prev.row > cur.row) {
-                    if(next.col > cur.col) {
+                } else if(prev->row > cur->row) {
+                    if(next->col > cur->col) {
                         SLOT = SNAKE_ULCORNER_SLOT;
-                    } else if(next.col < cur.col) {
+                    } else if(next->col < cur->col) {
                         SLOT = SNAKE_URCORNER_SLOT;
                     }
                 }
             }
         }
-
-        board[snake->segments[i].row][snake->segments[i].col] = SLOT;
-
+        board[snake->segments[i]->row][snake->segments[i]->col] = SLOT;
     }
     board[pill->row][pill->col] = PILL_SLOT;
 }
@@ -227,28 +262,23 @@ void DrawBoard(WINDOW *win, int board[board_size][board_size]) {
 
 void HandleResize(int s) {}
 
-Snake *CreateSnake(int segLength) {
-    Snake *newSnake = malloc(sizeof(Snake));
 
-    newSnake->direction = '0'; //FIXME:
-    newSnake->length = 1;
-    newSnake->segments = malloc(sizeof(CoordTuple) * segLength);
+void terminate(Snake* snake, CoordTuple* pill) {
+    endwin();
+    reset_shell_mode();
 
-    CoordTuple tempCoord;
-    tempCoord.row = board_size / 2;
-    tempCoord.col = board_size / 2;
+    free_Snake(snake);
+    free_CoordTuple(pill);
 
-    newSnake->segments[0] = tempCoord;
-
-    return newSnake;
+    exit(0);
 }
 
 int main() { 
     game_over = false;
     game_win = false;
 
-    Snake *snake = CreateSnake(board_size * board_size);
-    CoordTuple *pill = malloc(sizeof(int) * 2);
+    Snake* snake = CreateSnake(board_size * board_size);
+    CoordTuple* pill = malloc(sizeof(int) * 2);
 
     srand(time(NULL));
     
@@ -256,14 +286,13 @@ int main() {
 
     timeout(delay_ms);
 
-
     signal(SIGWINCH, HandleResize);
 
     int tw = getmaxx(stdscr);
     int th = getmaxy(stdscr);
 
-    WINDOW *boardWindow = newwin(board_size+1, (board_size*2)+1, 0, 0);    //(tw/2) - (board_size/2), (th/2) - (board_size/2)
-    WINDOW *infoWindow = newwin(board_size+1, 50, 0, (board_size*2)+1);    //(tw/2) - (board_size/2), (th/2) - (board_size/2)
+    WINDOW* boardWindow = newwin(board_size+1, (board_size*2)+1, 0, 0);    //(tw/2) - (board_size/2), (th/2) - (board_size/2)
+    WINDOW* infoWindow = newwin(board_size+1, 50, 0, (board_size*2)+1);    //(tw/2) - (board_size/2), (th/2) - (board_size/2)
 
     int board[board_size][board_size];
 
@@ -289,7 +318,7 @@ int main() {
             wprintw(infoWindow, "  Final length: %d\n", snake->length);
             wprintw(infoWindow, "  Press 'q' to quit or 'r' to restart.", snake->length);
         } else {
-            wprintw(infoWindow, "\n length: %d\n headpos: (%d,%d)\n pill: (%d,%d)\n", snake->length, snake->segments[snake->length - 1].row, snake->segments[snake->length - 1].col, pill->row, pill->col);
+            wprintw(infoWindow, "\n length: %d\n headpos: (%d,%d)\n pill: (%d,%d)\n", snake->length, snake->segments[snake->length - 1]->row, snake->segments[snake->length - 1]->col, pill->row, pill->col);
         }
 
         box(boardWindow, ACS_VLINE, ACS_HLINE);
@@ -312,19 +341,20 @@ int main() {
                 if(snake->length == 1 || snake->direction != 'w') snake->direction = 'e';
                 break;
             case 'q':
-                return 0;
+                terminate(snake, pill);
                 break;
             case 'r':
                 //TODO: implement reset
+                free_Snake(snake);
+                snake = CreateSnake(board_size * board_size);
+                UpdatePill(pill, snake);
+                game_over = false;
                 break;
         }
+
         if(!game_over) {
             UpdateSnake(snake, pill);
             UpdateBoard(board, snake, pill);
         }
     }
-
-    endwin();
-
-    return 0;
 }
