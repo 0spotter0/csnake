@@ -1,3 +1,6 @@
 .DS_Store
 
 snake
+
+*.o
+*.dSYM

@@ -7,10 +7,9 @@
 #include <time.h>
 #include <locale.h>
 
-int board_size = 16;
+int board_size = 15;
 int delay_ms = 150;
 bool game_over;
-bool game_win;
 
 typedef enum Slot {
     EMPTY_SLOT,
@@ -38,24 +37,24 @@ CoordTuple* CreateCoordTuple(int r, int c) {
 }
 
 void free_CoordTuple(CoordTuple* tuple) {
-   free(tuple);
-   tuple = NULL;
+    free(tuple);
+    tuple = NULL;
 }
 
 typedef struct Snake {
     char direction;
+    int MAX_LENGTH;
     int length;
     CoordTuple** segments;
-    int segmentsLength;
 } Snake;
 
-Snake* CreateSnake(int segLength) {
+Snake* CreateSnake(int maxLength) {
     Snake* newSnake = malloc(sizeof(Snake));
 
-    newSnake->direction = '0'; //FIXME:
+    newSnake->direction = 0;
     newSnake->length = 1;
-    newSnake->segments = calloc(sizeof(CoordTuple*), segLength);
-    newSnake->segmentsLength = segLength;
+    newSnake->segments = calloc(sizeof(CoordTuple*), maxLength);
+    newSnake->MAX_LENGTH = maxLength;
 
     CoordTuple* tempCoord = CreateCoordTuple(board_size / 2, board_size / 2);
 
@@ -65,7 +64,7 @@ Snake* CreateSnake(int segLength) {
 }
 
 void free_Snake(Snake* s) {
-    for (int i = 0; i < s->segmentsLength; i++) {
+    for (int i = 0; i < s->length; i++) {
         free_CoordTuple(s->segments[i]);
     }
     free(s->segments);
@@ -75,7 +74,7 @@ void free_Snake(Snake* s) {
 }
 
 bool SnakeCollides(Snake* snake, CoordTuple* target) {
-    for(int i = 0; i < snake->length; i++) {
+    for(int i = 1; i < snake->length; i++) {
         if(snake->segments[i]->row == target->row && snake->segments[i]->col == target->col) {
             return true;
         }
@@ -91,7 +90,7 @@ void UpdatePill(CoordTuple* pill, Snake* snake) {
 }
 
 void UpdateSnake(Snake *snake, CoordTuple *pill) {
-    CoordTuple* newHeadPos = CreateCoordTuple(snake->segments[snake->length - 1]->row, snake->segments[snake->length - 1]->col);
+    CoordTuple* newHeadPos = CreateCoordTuple(snake->segments[snake->length-1]->row, snake->segments[snake->length-1]->col);
 
     switch(snake->direction) {
         case 'n':
@@ -108,24 +107,30 @@ void UpdateSnake(Snake *snake, CoordTuple *pill) {
             break;
     }
 
-    if(snake->length == (board_size-1) * (board_size-1)) {
-        game_win = true;
-    } else if(newHeadPos->row <= 0 || newHeadPos->row >= board_size || newHeadPos->col <= 0 || newHeadPos->col >= board_size) {
+    if(newHeadPos->row <= 0 || newHeadPos->row >= board_size
+            || newHeadPos->col <= 0 || newHeadPos->col >= board_size) {
+        free_CoordTuple(newHeadPos);
         game_over = true;
-    } else if(snake->length > 1 && SnakeCollides(snake, newHeadPos)) {
-        game_over = true;
-    } else {
-        if(newHeadPos->row == pill->row && newHeadPos->col == pill->col) {
-            UpdatePill(pill, snake);
-            snake->segments[snake->length++] = newHeadPos;
-        }
-        else {
-            for(int i = 0; i < snake->length-1; i++) {
-                snake->segments[i] = snake->segments[i+1];
-            }
-            snake->segments[snake->length-1] = newHeadPos;
-        }
+        return;
     }
+    if (snake->length > 1 && SnakeCollides(snake, newHeadPos)) {
+        game_over = true;
+    }
+
+    // snake has eaten the pill
+    if(newHeadPos->row == pill->row && newHeadPos->col == pill->col) {
+        snake->segments[snake->length++] = newHeadPos;
+        if (snake->length == (board_size-1) * (board_size-1)) game_over = true;
+        else UpdatePill(pill, snake);
+        return;
+    }
+
+    // snake has not eaten the pill
+    free_CoordTuple(snake->segments[0]); // Reference to last segment is freed before overwriting
+    for(int i = 0; i < snake->length-1; i++) {
+        snake->segments[i] = snake->segments[i+1];
+    }
+    snake->segments[snake->length-1] = newHeadPos;
 }
 
 void ClearBoard(int board[board_size][board_size]) {
@@ -138,22 +143,25 @@ void ClearBoard(int board[board_size][board_size]) {
 
 void UpdateBoard(int board[board_size][board_size], Snake* snake, CoordTuple* pill) {
     ClearBoard(board);
+
+    board[pill->row][pill->col] = PILL_SLOT;
+
     for(int i = 0; i < snake->length; i++) {
 
         int SLOT = EMPTY_SLOT;
 
         //TODO: back item case
-        
+
         // if at snake->length - 1 => HEAD
         if(i == snake->length-1) {
             SLOT = SNAKE_HEAD_SLOT;
         } else if (i == 0) {
 
             // if next piece is same row:
-                // HLINE
+            // HLINE
 
             // if next piece is same col:
-                // VLINE
+            // VLINE
 
             CoordTuple* cur = snake->segments[i];
             CoordTuple* next = snake->segments[i+1];
@@ -207,7 +215,6 @@ void UpdateBoard(int board[board_size][board_size], Snake* snake, CoordTuple* pi
         }
         board[snake->segments[i]->row][snake->segments[i]->col] = SLOT;
     }
-    board[pill->row][pill->col] = PILL_SLOT;
 }
 
 void DrawBoard(WINDOW *win, int board[board_size][board_size]) {
@@ -274,14 +281,22 @@ void terminate(Snake* snake, CoordTuple* pill) {
 }
 
 int main() { 
-    game_over = false;
-    game_win = false;
+    if (board_size <= 2) {
+        printf("board size must be greater than 2\n");
+        exit(1);
+    }
+    if (delay_ms < 0) {
+        printf("delay must be >= 0\n");
+        exit(1);
+    }
 
-    Snake* snake = CreateSnake(board_size * board_size);
+    game_over = false;
+
+    Snake* snake = CreateSnake((board_size-1) * (board_size-1));
     CoordTuple* pill = malloc(sizeof(int) * 2);
 
     srand(time(NULL));
-    
+
     initscr();
 
     timeout(delay_ms);
@@ -297,7 +312,7 @@ int main() {
     int board[board_size][board_size];
 
     UpdatePill(pill, snake);
-    
+
     for(int r = 0; r < board_size; r++) {
         for(int c = 0; c < board_size; c++) {
             board[r][c] = EMPTY_SLOT;
@@ -313,7 +328,8 @@ int main() {
 
         DrawBoard(boardWindow, board);
 
-        if(game_win || game_over) {
+        if(game_over) {
+            bool game_win = snake->length == snake->MAX_LENGTH;
             wprintw(infoWindow, "\n  %s\n", (game_win) ? "YOU WIN!" : "GAME OVER");
             wprintw(infoWindow, "  Final length: %d\n", snake->length);
             wprintw(infoWindow, "  Press 'q' to quit or 'r' to restart.", snake->length);
@@ -344,9 +360,8 @@ int main() {
                 terminate(snake, pill);
                 break;
             case 'r':
-                //TODO: implement reset
                 free_Snake(snake);
-                snake = CreateSnake(board_size * board_size);
+                snake = CreateSnake((board_size-1) * (board_size-1));
                 UpdatePill(pill, snake);
                 game_over = false;
                 break;
