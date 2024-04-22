@@ -1,7 +1,4 @@
 # CSNAKE
-
->*"danger noodle" -Mark Hogben*
-
 ```
                ┌───┐
         ┌───┐  │   │
