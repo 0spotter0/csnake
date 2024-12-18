@@ -1,11 +1,12 @@
 # CSNAKE
+
 ```
                ┌───┐
         ┌───┐  │   │
  *  %───┘   └──┘   └────·
 ```
 
-snake game:<br>
+snake game:
 -
 collect the `*`, avoid walls and your tail
 - wasd - move
@@ -13,5 +14,4 @@ collect the `*`, avoid walls and your tail
 - r - restart
 
 ---
-Sammy Potter<br>
-*May 2022*
+Sammy Potter
