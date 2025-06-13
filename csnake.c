@@ -10,6 +10,7 @@
 int board_size = 15;
 int delay_ms = 150;
 bool game_over;
+bool game_paused = false;
 
 typedef enum Slot {
     EMPTY_SLOT,
@@ -108,7 +109,7 @@ void UpdateSnake(Snake *snake, CoordTuple *pill) {
     }
 
     if(newHeadPos->row <= 0 || newHeadPos->row >= board_size
-            || newHeadPos->col <= 0 || newHeadPos->col >= board_size) {
+        || newHeadPos->col <= 0 || newHeadPos->col >= board_size) {
         free_CoordTuple(newHeadPos);
         game_over = true;
         return;
@@ -149,8 +150,6 @@ void UpdateBoard(int board[board_size][board_size], Snake* snake, CoordTuple* pi
     for(int i = 0; i < snake->length; i++) {
 
         int SLOT = EMPTY_SLOT;
-
-        //TODO: back item case
 
         // if at snake->length - 1 => HEAD
         if(i == snake->length-1) {
@@ -280,7 +279,14 @@ void terminate(Snake* snake, CoordTuple* pill) {
     exit(0);
 }
 
-int main() { 
+int main(int argc, char** argv) {
+    if (argc != 2) {
+        printf("Usage:\n\tsnake <board_size>\n");
+        exit(1);
+    }
+
+    board_size = atoi(argv[1]);
+
     if (board_size <= 2) {
         printf("board size must be greater than 2\n");
         exit(1);
@@ -356,6 +362,9 @@ int main() {
             case 'd':
                 if(snake->length == 1 || snake->direction != 'w') snake->direction = 'e';
                 break;
+            case 'p':
+                game_paused = !game_paused;
+                break;
             case 'q':
                 terminate(snake, pill);
                 break;
@@ -367,7 +376,7 @@ int main() {
                 break;
         }
 
-        if(!game_over) {
+        if(!game_over && !game_paused) {
             UpdateSnake(snake, pill);
             UpdateBoard(board, snake, pill);
         }
