@@ -7,10 +7,10 @@
 #include <time.h>
 #include <locale.h>
 
-int board_size = 15;
-int delay_ms = 150;
+int board_size; // 15
+int delay_ms; // 150
 bool game_over;
-bool game_paused = false;
+bool game_paused;
 
 typedef enum Slot {
     EMPTY_SLOT,
@@ -280,12 +280,13 @@ void terminate(Snake* snake, CoordTuple* pill) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage:\n\tsnake <board_size>\n");
+    if (argc != 3) {
+        printf("Usage:\n\tsnake <board_size> <update_delay_ms>\n");
         exit(1);
     }
 
     board_size = atoi(argv[1]);
+    delay_ms = atoi(argv[2]);
 
     if (board_size <= 2) {
         printf("board size must be greater than 2\n");
@@ -297,6 +298,7 @@ int main(int argc, char** argv) {
     }
 
     game_over = false;
+    game_paused = false;
 
     Snake* snake = CreateSnake((board_size-1) * (board_size-1));
     CoordTuple* pill = malloc(sizeof(int) * 2);
@@ -338,8 +340,11 @@ int main(int argc, char** argv) {
             bool game_win = snake->length == snake->MAX_LENGTH;
             wprintw(infoWindow, "\n  %s\n", (game_win) ? "YOU WIN!" : "GAME OVER");
             wprintw(infoWindow, "  Final length: %d\n", snake->length);
-            wprintw(infoWindow, "  Press 'q' to quit or 'r' to restart.", snake->length);
+            wprintw(infoWindow, "  Press 'q' to quit or 'r' to restart.");
         } else {
+            if (game_paused) {
+                wprintw(infoWindow, "\n PAUSED...");
+            }
             wprintw(infoWindow, "\n length: %d\n headpos: (%d,%d)\n pill: (%d,%d)\n", snake->length, snake->segments[snake->length - 1]->row, snake->segments[snake->length - 1]->col, pill->row, pill->col);
         }
 
@@ -369,10 +374,11 @@ int main(int argc, char** argv) {
                 terminate(snake, pill);
                 break;
             case 'r':
+                game_paused = false;
+                game_over = false;
                 free_Snake(snake);
                 snake = CreateSnake((board_size-1) * (board_size-1));
                 UpdatePill(pill, snake);
-                game_over = false;
                 break;
         }
 
